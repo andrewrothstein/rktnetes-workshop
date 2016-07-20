@@ -1,6 +1,6 @@
 {
-  "name": "rkt8s workshop",
+  "name": "rktnetes workshop",
   "tagline": "",
-  "body": "### Welcome to the rktnetes workshop\r\nThis page hosts the ACI images for the workshop.",
+  "body": "### Welcome to the rktnetes workshop\r\nThis page hosts sample ACI images for the workshop.",
   "note": "Don't delete this file! It's used internally to help with page regeneration."
 }

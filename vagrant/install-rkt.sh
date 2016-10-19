@@ -4,7 +4,7 @@ set -x
 
 cd $(mktemp -d)
 
-rkt_version="1.14.0"
+rkt_version="1.17.0"
 k8s_version="v1.4.3_coreos.0"
 
 dnf -y install \
@@ -26,42 +26,16 @@ tar -xzf cni-v0.3.0.tgz --directory /opt/cni/bin
 curl -sSL https://coreos.com/dist/pubkeys/app-signing-pubkey.gpg | gpg2 --import -
 key=$(gpg2 --with-colons --keyid-format LONG -k security@coreos.com | egrep ^pub | cut -d ':' -f5)
 
-curl -O -L https://github.com/coreos/rkt/releases/download/v"${rkt_version}"/rkt-v"${rkt_version}".tar.gz
-curl -O -L https://github.com/coreos/rkt/releases/download/v"${rkt_version}"/rkt-v"${rkt_version}".tar.gz.asc
+curl -O -L https://github.com/coreos/rkt/releases/download/v"${rkt_version}"/rkt-"${rkt_version}"-1.x86_64.rpm
+curl -O -L https://github.com/coreos/rkt/releases/download/v"${rkt_version}"/rkt-"${rkt_version}"-1.x86_64.rpm.asc
 
 gpg2 --trusted-key "${key}" --verify-files *.asc
 
-tar xvzf rkt-v"${rkt_version}".tar.gz
-
-for flavor in fly coreos kvm; do
-    install -Dm644 rkt-v${rkt_version}/stage1-${flavor}.aci /usr/lib/rkt/stage1-images/stage1-${flavor}.aci
-done
-
-install -Dm755 rkt-v${rkt_version}/rkt /usr/bin/rkt
-
-for f in rkt-v${rkt_version}/manpages/*; do
-    install -Dm644 "${f}" "/usr/share/man/man1/$(basename $f)"
-done
-
-install -Dm644 rkt-v${rkt_version}/bash_completion/rkt.bash /usr/share/bash-completion/completions/rkt
-install -Dm644 rkt-v${rkt_version}/init/systemd/tmpfiles.d/rkt.conf /usr/lib/tmpfiles.d/rkt.conf
-
-for unit in rkt-gc.{timer,service} rkt-metadata.{socket,service}; do
-    install -Dm644 rkt-v${rkt_version}/init/systemd/$unit /usr/lib/systemd/system/$unit
-done
-
-for unit in service; do
-    install -Dm644 /vagrant/rkt-api.${unit} /usr/lib/systemd/system/rkt-api.${unit}
-done
+rpm -Uvh rkt-"${rkt_version}"-1.x86_64.rpm
 
 for unit in etcd.service apiserver.service controller-manager.service kubelet.service scheduler.service proxy.service; do
     install -Dm644 /vagrant/${unit} /usr/lib/systemd/system/${unit}
 done
-
-groupadd --force --system rkt-admin
-groupadd --force --system rkt
-
-./rkt-v"${rkt_version}"/scripts/setup-data-dir.sh
 
 gpasswd -a vagrant rkt
 gpasswd -a vagrant rkt-admin
@@ -94,16 +68,9 @@ rkt trust --trust-keys-from-https --prefix "coreos.com/rkt/stage1-fly"
 rkt trust --trust-keys-from-https --prefix "coreos.com/rkt/stage1-coreos"
 
 rkt fetch quay.io/coreos/hyperkube:"${k8s_version}"
-rkt fetch coreos.com/rkt/stage1-fly:${rkt_version}
-rkt fetch coreos.com/rkt/stage1-coreos:${rkt_version}
 rkt fetch quay.io/coreos/etcd:v2.3.7
 
-rkt fetch --insecure-options=image docker://gcr.io/google_containers/kubedns-amd64:1.3
-rkt fetch --insecure-options=image docker://gcr.io/google_containers/kube-dnsmasq-amd64:1.3
-rkt fetch --insecure-options=image docker://gcr.io/google_containers/exechealthz-amd64:1.0
-
 systemctl daemon-reload
-systemd-tmpfiles --create /usr/lib/tmpfiles.d/rkt.conf
 
 for unit in rkt-api etcd apiserver controller-manager kubelet scheduler proxy; do
     systemctl enable ${unit}

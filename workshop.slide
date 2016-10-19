@@ -580,7 +580,7 @@ Deploy the Kubernetes Dashboard
 
   kubectl create -f https://rawgit.com/kubernetes/dashboard/master/src/deploy/kubernetes-dashboard.yaml
   ip address show dev eth1
-  kubect get po --namespace=kube-system kubernetes-dashboard -o yaml
+  kubectl get svc --namespace=kube-system kubernetes-dashboard -o yaml
 
 1. Get the assigned NodePort
 2. Open http://<vm-ip>:NodePort on the host

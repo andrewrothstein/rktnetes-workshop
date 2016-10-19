@@ -5,20 +5,18 @@ set -x
 cd $(mktemp -d)
 
 rkt_version="1.10.1"
-k8s_version="v1.3.2_coreos.0"
+k8s_version="v1.3.5_coreos.1"
 
 dnf -y install \
     openssl \
     systemd-container
 
-kurl="https://storage.googleapis.com/kubernetes-release/release/v1.3.0/bin/linux/amd64"
+kurl="https://storage.googleapis.com/kubernetes-release/release/v1.3.5/bin/linux/amd64"
 
 curl -O -L "${kurl}"/kubectl
-[[ $(sha1sum kubectl | cut -d' ' -f1) == "b0a5fbc0b9d9e3d3c56d35eb6ac591200e869240" ]] || (echo "invalid checksum"; exit 1)
 install -Dm755 kubectl /usr/bin/kubectl
 
 curl -O -L "${kurl}"/hyperkube
-[[ $(sha1sum hyperkube | cut -d' ' -f1) == "fb6894d413c3ea0d9950f79642d20b29c48ff0e8" ]] || (echo "invalid checksum"; exit 1)
 install -Dm755 hyperkube /usr/bin/hyperkube
 
 curl -O -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz

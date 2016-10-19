@@ -4,14 +4,14 @@ set -x
 
 cd $(mktemp -d)
 
-rkt_version="1.10.1"
-k8s_version="v1.3.5_coreos.1"
+rkt_version="1.14.0"
+k8s_version="v1.4.3_coreos.0"
 
 dnf -y install \
     openssl \
     systemd-container
 
-kurl="https://storage.googleapis.com/kubernetes-release/release/v1.3.5/bin/linux/amd64"
+kurl="https://storage.googleapis.com/kubernetes-release/release/v1.4.3/bin/linux/amd64"
 
 curl -O -L "${kurl}"/kubectl
 install -Dm755 kubectl /usr/bin/kubectl
@@ -50,7 +50,7 @@ for unit in rkt-gc.{timer,service} rkt-metadata.{socket,service}; do
     install -Dm644 rkt-v${rkt_version}/init/systemd/$unit /usr/lib/systemd/system/$unit
 done
 
-for unit in {socket,service}; do
+for unit in service; do
     install -Dm644 /vagrant/rkt-api.${unit} /usr/lib/systemd/system/rkt-api.${unit}
 done
 

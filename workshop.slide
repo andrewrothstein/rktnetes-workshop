@@ -22,7 +22,7 @@ Yes ... I do use the Linux Desktop :-)
 - Learn about rkt
 - Use rkt
 - Learn about Kubernetes
-- Use Kubernetes with rkt
+- Use Kubernetes+rkt = rktnetes
 
 Requirements:
 
@@ -36,200 +36,45 @@ Requirements:
   vagrant up
   vagrans ssh
 
-* rkt - What is it?
+* Starting nginx
 
-rkt (pronounced _rock-it_) is a CLI for running app containers on Linux. rkt is designed to be secure, composable, and standards-based.
+  sudo rkt run --insecure-options=image docker://nginx
 
-- It runs on Linux only (currently).
-- It runs on Intel `amd64`.
-- Port to `arm64` is underway.
+In another terminal:
 
-* rkt - a brief history
+  $ rkt l
+  [vagrant@localhost ~]$ rkt l
+  UUID		APP      ... NETWORKS
+  0e32f69d	busybox  ... default:ip4=172.16.28.2
 
-*December*2014* - _v0.1.0_
-
-- Prototype
-- Drive conversation (security, standards) and competition (healthy OSS) in container ecosystem
-
-*February*2016* - _v1.0.0_
-
-- Used in Production
-- API stability guarantees
-
-*June*2016* - _v1.9.0_
-
-- Packaged in Debian, Fedora, Arch, NixOS
-
-* rkt - Philosophy, Idioms
-
-*UX:*"secure-by-default"*
-
-- Verify image signatures by default
-- Verify image integrity by default
-
-*Architecture:*Unix*philosophy*
-
-- Well-defined operations
-- No central priviledged long-running components
-- Separate privileges for different operations, i.e. "fetch"
-- Verbose at times
-
-* rkt - Security
-
-- User namespaces (Container `euid` `!=` `host_euid`)
-- SELinux contexts (Isolate individual pods)
-- VM containment (LKVM)
-- TPM measurements (Tamper-proof audit log of what's running)
-
-* rkt - Security (soon)
-
-- Finer-grained Linux capabilities
-- Seccomp defaults
-- Better SELinux support
-- Cgroup2 + cgroup namespaces support
-- Qemu (hypervisor) support
-- Unpriviledged containers
-
-* rkt - Composability
-
-*External*
-
-- Integrate with existing init system(s)
-- Work well with higher level cluster orchestration tools (i.e. Kubernetes)
-- Simple process model: rkt command _is_ the container
-- Any context applied to rkt (cgroups, etcd.) applies transitively to the pods inside rkt
-- Optional gRPC API server
-
-*Internal*
-
-- stage based architecture
-- Swappable execution engines running containers
-
-* rkt vs. Docker
-
-.image rkt-vs-docker-process-model.png 500 _
-
-* rkt vs. Docker
-
-.image rkt-vs-docker-fetch.png 500 _
-
-* rkt - Speaking of images
-
-.image image-standards.png
-
-* rkt - Image support
-
-- ACI - yes
-- Docker - yes
-
-Caveat: Docker images do not suport signing, start with `--insecure-options=image`
-
-- OCI - WIP
-
-*Workshop*time*
-
-1. Start nginx
-
-  rkt run --insecure-options=image docker://nginx
-
-2. Start an interactive container
-
-  rkt run --insecure-options=image --interactive docker://progrium/busybox
+  $ curl 172.16.28.2
+  curl 172.16.28.2
+  <!DOCTYPE html>
+  <html>
+  <head>
+  <title>Welcome to nginx!</title>
+  ...
 
 quit by hitting `Ctrl-]` three times
 
-* rkt vs. ?
+* Starting an interactive busybox
 
-.link https://github.com/coreos/rkt/blob/master/Documentation/rkt-vs-other-projects.md
+  $ sudo rkt run --insecure-options=image --interactive docker://progrium/busybox
+  
+  image: using image from local store for image name coreos.com/rkt/stage1-coreos:1.17.0
+  image: using image from local store for url docker://progrium/busybox
+  networking: loading networks from /etc/rkt/net.d
+  networking: loading network default with type ptp
+  / #
 
-* rkt stages
+ 
 
-Execution with rkt is divided into several distinct stages.
+  / # ping www.google.de
+  ping: bad address 'www.google.de'
 
-*stage0*
+Note: pod doesn't have DNS by default
 
-The `rkt` binary itself.
-
-- Fetch images
-- Generate pod UUIDs, manifest
-- Create filesystem for the pod
-- Set up further stages
-- Unpack stage1 into pod file system
-- Unpack app images into stage2 directories
-
-* rkt stages - stage1
-
-*stage1*:
-
-An image providing:
-
-- Initializes container isolation
-- Starts and initializes container supervision
-- Reads pods and image manifests
-- Starts the actual applications
-
-This is swappable, comes in different "flavors":
-
-- _fly_: does nothing really ... just a chroot environment
-- _coreos_: uses Linux cgroups, namespaces, leverages systemd
-- _kvm_: Uses LKVM supervisor to boot a real virtualized kernel
-
-* rkt stages - coreos stage1
-
-Provides container isolation
-
-stage1-coreos.aci
-
-  host OS
-  └─ rkt
-    └─ systemd-nspawn
-      └─ systemd
-        └─ chroot
-          └─ user-app1
-
-- *systemd-nspawn*: Implements the initialization of cgroups, namespaces
-- *systemd*: Implements supervision of containers
-
-* rkt stages - fly stage1
-
-stage1-fly.aci
-
-  host OS
-  └─ rkt
-    └─ chroot
-      └─ user-app1
-
-- Just a chroot'ed application
-
-but
-
-- Secure image retrieval including signature validation
-- Lightweight, isolated package manager
-
-* rkt stages - ??? stage1
-
-Crazy ideas:
-
-- _xhyve_: OSX virtualization allowing rkt to run natively on a Mac
-- _runit_: Don't like systemd? Bring your own isolator/supervisor
-
-PRs/Contributions welcome!
-
-* rkt stages - fly stage2
-
-.image you.png _ 400
-
-* rkt - build your own image
-
-*Workshop*time*
-
-.link https://github.com/s-urbaniak/inspector
-.link https://coreos.com/rkt/docs/latest/signing-and-verification-guide.html
-
-- Build a small Go application
-- Build an ACI image
-- Sign the image using `gpg`
-- Make the image discoverable via github pages
+Start the pod above using `--dns=8.8.8.8`
 
 * Let's step back
 
@@ -252,14 +97,12 @@ In a classical "OS" setup we have:
 
 * rkt - Sample Pod: micro-service talking to Redis
 
-*Workshop*time*
-
 .image redis-service.png _ 230
 
-  sudo rkt run --insecure-options=image docker://redis \
-    s-urbaniak.github.io/rktnetes-workshop/redis-service:0.0.1
-  rkt list && rkt cat-manifest deadbeef
-  curl <pod-ip>:8080
+  sudo rkt run \
+    --insecure-options=image \
+    docker://redis \
+    s-urbaniak.github.io/images/redisservice:0.0.2
 
 .link https://github.com/s-urbaniak/redis-service
 
@@ -326,6 +169,26 @@ Ready-to-use generic leader elector:
 - Main app sends a simple request
 - Auxiliary app implements complex scatter/gather logic
 - Fan-Out/Fan-In requests separate from main app
+
+* Building pods
+
+.link https://github.com/s-urbaniak/inspector
+.link https://coreos.com/rkt/docs/latest/signing-and-verification-guide.html
+
+- Build a small Go application
+- Build an ACI image
+- Sign the image using `gpg`
+
+* Signing builds (locally)
+
+1. Create a key (if you don't have one already)
+
+  $ gpg2 --full-gen-key
+
+2. Trust the key
+
+  $ gpg2 --armor --export your@email.com >public.asc
+  $ sudo rkt trust --prefix=your/image/name ./public.asc
 
 * rkt - Networking
 
@@ -396,12 +259,6 @@ The CNI (Container Network Interface)
 - Pods get different IPs
 - Pods share the same physical device
 
-* rkt - Networking
-
-*Workshop*time*
-
-Configure a ptp network, start two `busybox` pods pinging each other.
-
 * rkt - Networking - SDN (software defined networking)
 
 .image pod-net-canal.png 300 _
@@ -409,6 +266,31 @@ Configure a ptp network, start two `busybox` pods pinging each other.
 - Communicate with pods across different _hosts_
 - Each pod across all hosts gets its own IP
 - Virtual overlay network
+
+* rkt - Networking
+
+Example: bridge two pods, so they can see each other
+
+  $ cat /etc/rkt/net.d/bridge.conf
+  {
+      "name": "bridge-nat",
+      "type": "bridge",
+      "bridge": "rkt-bridge-nat",
+      "ipMasq": true,
+      "isGateway": true,
+      "ipam": {
+          "type": "host-local",
+          "subnet": "10.2.0.0/24",
+          "routes": [
+                  { "dst": "0.0.0.0/0" }
+          ]
+      }
+  }
+ 
+  $ sudo rkt run --net=bridge docker://nginx
+ 
+  $ sudo rkt run --net=bridge --interactive docker://progrium/busybox
+  $ wget 10.2.0.2
 
 * Kubernetes - Overview
 

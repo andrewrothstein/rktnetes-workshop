@@ -6,16 +6,24 @@ cd $(mktemp -d)
 
 rkt_version="1.17.0"
 k8s_version="v1.4.3_coreos.0"
+acbuild_version="0.4.0"
 
 dnf -y install \
     openssl \
-    systemd-container
+    systemd-container \
+    go \
+    git \
+    rng-tools
+
+curl -O -L https://github.com/containers/build/releases/download/v"${acbuild_version}"/acbuild-v"${acbuild_version}".tar.gz
+tar -xzf acbuild-v"${acbuild_version}".tar.gz
+install -Dm755 acbuild-v"${acbuild_version}"/acbuild /usr/bin/acbuild
+install -Dm755 acbuild-v"${acbuild_version}"/acbuild-chroot /usr/bin/acbuild-chroot
+install -Dm755 acbuild-v"${acbuild_version}"/acbuild-script /usr/bin/acbuild-script
 
 kurl="https://storage.googleapis.com/kubernetes-release/release/v1.4.3/bin/linux/amd64"
-
 curl -O -L "${kurl}"/kubectl
 install -Dm755 kubectl /usr/bin/kubectl
-
 curl -O -L "${kurl}"/hyperkube
 install -Dm755 hyperkube /usr/bin/hyperkube
 
@@ -72,10 +80,7 @@ rkt fetch quay.io/coreos/etcd:v2.3.7
 
 systemctl daemon-reload
 
-for unit in rkt-api etcd apiserver controller-manager kubelet scheduler proxy; do
-    systemctl enable ${unit}
-    systemctl start ${unit}
-done
+systemctl enable rngd
+systemctl start rngd
 
-wait-for kubelet
-kubectl create -f /vagrant/skydns.yaml
+install -d --group=vagrant --owner=vagrant /home/vagrant/gopath /home/vagrant/gopath/src /home/vagrant/gopath/bin /home/vagrant/gopath/pkg

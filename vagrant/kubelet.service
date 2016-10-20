@@ -5,18 +5,52 @@ After=wait-for@apiserver.service
 Requires=wait-for@apiserver.service
 
 [Service]
-ExecStart=/usr/bin/hyperkube \
-	kubelet \
-	--v=3 \
-	--container-runtime=rkt \
-	--rkt-path=/usr/bin/rkt \
-	--hostname-override=127.0.0.1 \
-	--address=0.0.0.0 \
-	--api-servers=0.0.0.0:8080 \
-	--cluster-dns=10.0.0.10 --cluster-domain=cluster.local \
-	--network-plugin-dir=/opt/cni/bin \
-	--resolv-conf=/etc/kubernetes/resolv.conf \
-	--port=10250
+ExecStart=/usr/bin/rkt run \
+        --volume etc-kubernetes,kind=host,source=/etc/kubernetes,readOnly=false \
+        --mount volume=etc-kubernetes,target=/etc/kubernetes \
+        --volume etc-ssl-certs,kind=host,source=/etc/ssl/certs,readOnly=true \
+        --mount volume=etc-ssl-certs,target=/etc/ssl/certs \
+        --volume var-lib-docker,kind=host,source=/var/lib/docker,readOnly=false \
+        --mount volume=var-lib-docker,target=/var/lib/docker \
+        --volume var-lib-kubelet,kind=host,source=/var/lib/kubelet,readOnly=false \
+        --mount volume=var-lib-kubelet,target=/var/lib/kubelet \
+        --volume os-release,kind=host,source=/usr/lib/os-release,readOnly=true \
+        --mount volume=os-release,target=/etc/os-release \
+        --volume run,kind=host,source=/run \
+        --mount volume=run,target=/run \
+        --volume dns,kind=host,source=/etc/resolv.conf \
+        --mount volume=dns,target=/etc/resolv.conf \
+        --volume rkt,kind=host,source=/usr/bin/host-rkt \
+        --mount volume=rkt,target=/usr/bin/rkt \
+        --volume var-lib-rkt,kind=host,source=/var/lib/rkt \
+        --mount volume=var-lib-rkt,target=/var/lib/rkt \
+        --volume stage,kind=host,source=/tmp \
+        --mount volume=stage,target=/tmp \
+        --volume var-log,kind=host,source=/var/log \
+        --mount volume=var-log,target=/var/log \
+        --volume etc-cni-netd,kind=host,source=/etc/cni/net.d \
+        --mount volume=etc-cni-netd,target=/etc/cni/net.d \
+        --trust-keys-from-https \
+        --stage1-from-dir=stage1-fly.aci \
+        quay.io/coreos/hyperkube:v1.4.3_coreos.0 \
+        --exec=/hyperkube \
+        -- \
+        kubelet \
+        --v=3 \
+        --container-runtime=rkt \
+        --rkt-path=/usr/bin/rkt \
+        --hostname-override=127.0.0.1 \
+        --address=0.0.0.0 \
+        --port=10250 \
+        --api-servers=127.0.0.1:8080 \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local \
+        --network-plugin=cni \
+        --cni-conf-dir=/etc/cni/net.d \
+        --resolv-conf=/etc/kubernetes/resolv.conf \
+        --register-schedulable=true \
+        --allow-privileged=true \
+        --rkt-stage1-image=coreos.com/rkt/stage1-coreos
 
 [Install]
 WantedBy=multi-user.target

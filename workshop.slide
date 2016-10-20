@@ -1,26 +1,18 @@
 Basics with rkt, the container engine by CoreOS
 
-27th June 2016
+Oct 20th 2016
 
 Sergiusz Urbaniak
 rkt Engineer, CoreOS
 sur@coreos.com
 @_surbaniak
 
-* whoami
-
-Software Engineer at CoreOS
-
-rkt developer
-
-Yes ... I do use the Linux Desktop :-)
-
 * Overview
 
 .image rkt8s.png _ 600
 
 - Learn about rkt
-- Use rkt
+- Use rtk
 - Learn about Kubernetes
 - Use Kubernetes+rkt = rktnetes
 
@@ -31,19 +23,27 @@ Requirements:
 
 * Setup
 
+We will:
+
+- use Linux Fedora 24
+- install [[http://github.com/coreos/rkt][rkt]]
+- install [[https://github.com/containers/build][acbuild]]
+
   git clone https://github.com/coreos/rktnetes-workshop
   cd vagrant
   vagrant up
-  vagrans ssh
+  vagrant ssh
 
 * Starting nginx
+
+Simple one-shot command
 
   sudo rkt run --insecure-options=image docker://nginx
 
 In another terminal:
 
-  $ rkt l
-  [vagrant@localhost ~]$ rkt l
+  $ rkt list
+  [vagrant@localhost ~]$ rkt list
   UUID		APP      ... NETWORKS
   0e32f69d	busybox  ... default:ip4=172.16.28.2
 
@@ -56,6 +56,23 @@ In another terminal:
   ...
 
 quit by hitting `Ctrl-]` three times
+
+* Starting nginx
+
+Fetch first, then run:
+
+  rkt fetch quay.io/josh_wood/caddy
+  sudo rkt run quay.io/josh_wood/caddy
+
+Prepare, then run:
+
+  sudo rkt prepare quay.io/josh_wood/caddy
+  ...
+  8978e12d-6687-47e3-9480-69e3a155295c
+
+ 
+
+  sudo rkt run-prepared 8978e12d-6687-47e3-9480-69e3a155295c
 
 * Starting an interactive busybox
 
@@ -75,6 +92,88 @@ quit by hitting `Ctrl-]` three times
 Note: pod doesn't have DNS by default
 
 Start the pod above using `--dns=8.8.8.8`
+
+* Operations on pods
+
+
+  $ rkt list --format=json
+  [{"name":"f64282eb-9f76-4b5d-8d48-bd2b3c7c41e6","state":"running","networks":[{"netName":"default","netConf":"net/99-default.conf","pluginPath":"stage1/rootfs/usr/lib/rkt/plugins/net/ptp","ifName":"eth0","ip":"172.16.28.3","args":"","mask":"255.255.255.0"}],"app_names":["nginx"]}]
+
+ 
+
+  $ rkt status f64282eb-9f76-4b5d-8d48-bd2b3c7c41e6
+  state=running
+  created=2016-10-20 12:37:34.069 +0000 UTC
+  started=2016-10-20 12:37:34.163 +0000 UTC
+  networks=default:ip4=172.16.28.3
+  pid=8113
+
+ 
+  $ sudo rkt stop f64282eb-9f76-4b5d-8d48-bd2b3c7c41e6
+  "f64282eb-9f76-4b5d-8d48-bd2b3c7c41e6"
+
+ 
+
+  $ rkt cat-manifest f64282eb-9f76-4b5d-8d48-bd2b3c7c41e6
+  {
+  	"acVersion": "1.17.0",
+  	"acKind": "PodManifest",
+  ...
+
+* Operations on images
+
+Listing images
+
+  $ rkt image list
+  ID			NAME						SIZE	IMPORT TIME	LAST USED
+  sha512-3214c5b3dad1	quay.io/coreos/hyperkube:v1.4.3_coreos.0	1.2GiB	9 minutes ago	9 minutes ago
+  sha512-06ef01473d5f	quay.io/coreos/etcd:v2.3.7			62MiB	9 minutes ago	9 minutes ago
+  sha512-bd4c342830c8	coreos.com/rkt/stage1-coreos:1.17.0		179MiB	8 minutes ago	8 minutes ago
+  sha512-ec6258f8adf2	coreos.com/rkt/stage1-fly:1.17.0		17MiB	4 minutes ago	4 minutes ago
+  sha512-1e315d546ce1	registry-1.docker.io/library/nginx:latest	356MiB	2 minutes ago	2 minutes ago
+
+Deleting an image
+
+  $ sudo rkt image rm quay.io/josh_wood/caddy
+
+* Cleaning up
+
+rkt does not have a daemon, hence cleaning up is done manually, or in a cron-like job:
+
+  $ sudo rkt gc --grace-period=0s
+
+* Starting rkt in the background
+
+i.e. 
+
+  $ sudo rkt run docker://nginx &
+
+not a good idea, rather start a transient systemd unit:
+
+  $ sudo systemd-run rkt run docker://nginx
+  Running as unit run-r267cd42efd35471aaa1deb65ede22f25.service.
+
+inspect logs using:
+
+  $ sudo journalctl -u run-r267cd42efd35471aaa1deb65ede22f25.service
+
+stop the unit using:
+
+  $ sudo systemctl stop run-r267cd42efd35471aaa1deb65ede22f25.service
+
+* rkt Documentation
+
+We have quite nice man pages:
+
+  man rkt
+  man rkt_run
+  man rkt_prepare
+  man rkt_gc
+  man rkt_fetch
+  man rkt_image
+  man rkt_image_rm
+
+.link https://github.com/coreos/rkt/tree/master/Documentation
 
 * Let's step back
 
@@ -170,16 +269,13 @@ Ready-to-use generic leader elector:
 - Auxiliary app implements complex scatter/gather logic
 - Fan-Out/Fan-In requests separate from main app
 
-* Building pods
+* Building pods - a small web app
 
-.link https://github.com/s-urbaniak/inspector
-.link https://coreos.com/rkt/docs/latest/signing-and-verification-guide.html
+  $ cat /home/vagrant/gopath/src/app/app.go
 
-- Build a small Go application
-- Build an ACI image
-- Sign the image using `gpg`
+.code app.go
 
-* Signing builds (locally)
+* Create a GPG key
 
 1. Create a key (if you don't have one already)
 
@@ -188,7 +284,26 @@ Ready-to-use generic leader elector:
 2. Trust the key
 
   $ gpg2 --armor --export your@email.com >public.asc
-  $ sudo rkt trust --prefix=your/image/name ./public.asc
+  $ sudo rkt trust --prefix=workshop ./public.asc
+
+* Create an ACI image
+
+  $ cat /home/vagrant/gopath/src/app/acbuild.sh
+
+.code acbuild.sh 1,20
+
+* Create an ACI image
+
+.code acbuild.sh 21,
+
+  $ sudo rkt run ./app-0.0.1-linux-amd64.aci
+
+* What if I have Docker images?
+
+- No need to convert them
+- Just use
+
+  rkt run --insecure-options=image docker://app
 
 * rkt - Networking
 
@@ -273,7 +388,7 @@ Example: bridge two pods, so they can see each other
 
   $ cat /etc/rkt/net.d/bridge.conf
   {
-      "name": "bridge-nat",
+      "name": "pod-bridge",
       "type": "bridge",
       "bridge": "rkt-bridge-nat",
       "ipMasq": true,
@@ -287,9 +402,9 @@ Example: bridge two pods, so they can see each other
       }
   }
  
-  $ sudo rkt run --net=bridge docker://nginx
+  $ sudo rkt run --net=pod-bridge docker://nginx
  
-  $ sudo rkt run --net=bridge --interactive docker://progrium/busybox
+  $ sudo rkt run --net=pod-bridge --interactive docker://progrium/busybox
   $ wget 10.2.0.2
 
 * Kubernetes - Overview
@@ -317,11 +432,30 @@ Handles:
 
 .image control-loop.png _ 300
 
-- Embeds the core control loops
-- Is _state-less_
-- Is decoupled from etcd via the API-server
+Embeds the core control loops:
+Is _state-less_
+Is decoupled from etcd via the API-server
 
 Just a daemon talking to etcd
+
+* k8s - Components - Controller Manager
+
+Token Controller
+Endpoint Controller
+Replication, Replica Set Controller
+Node Controller
+Resource Quota Controller
+Namespace Controller
+Horizontal Scaling Controller
+Daemon Sets, Pet Sets Controller
+Job Controller, Scheduled Job Controller
+Deployment Controller
+Disruption Controller
+Persistent Volumes Controller
+Attach/Detach Controller
+Certification Controller
+Service Accounts Controller
+Garbage Collector
 
 * k8s - Components - Scheduler
 
@@ -368,67 +502,35 @@ Primary network proxy on each node.
 
 * k8s - Let's do it!
 
-*Workshop*time*
+  $ systemctl start etcd apiserver controller-manager scheduler kubelet proxy
 
-1. Start Kubernetes
-2. Create a service
-3. Launch nginx
-4. Launch busybox
-5. Exec into busybox
-6. Launch the Kubernetes dashboard
-7. Open it from the host machine
+Verify startup
 
-See the next slides for templates.
+  $ systemctl status etcd apiserver controller-manager scheduler kubelet proxy
+  $ kubectl get node
 
-* rktnetes - nginx Service
+* rktnetes - nginx Deployment
 
-*Workshop*time*
-
-  kind: Service
-  apiVersion: v1
+  apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
-    labels:
-      app: nginx
-    name: nginx
+    name: nginx-deployment
   spec:
-    type: NodePort
-    ports:
-    - port: 80
-      targetPort: 80
-    selector:
-      app: nginx
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: nginx
+      spec:
+        containers:
+        - name: nginx
+          image: nginx:1.7.9
+          ports:
+          - containerPort: 80
 
  
 
-  kubectl create -f nginx-svc.yaml
-
-* rktnetes - nginx Replication Controller
-
-    kind: ReplicationController
-    apiVersion: v1
-    metadata:
-      labels:
-        app: nginx
-      name: nginx
-    spec:
-      replicas: 1
-      selector:
-        app: nginx
-      template:
-        metadata:
-          labels:
-            app: nginx
-        spec:
-          containers:
-          - name: nginx
-            image: nginx
-            ports:
-            - containerPort: 80
-              protocol: TCP
-
- 
-
-  kubectl create -f nginx-rc.yaml
+  kubectl create -f nginx.yaml
 
 * rktnetes - busybox pod
 
@@ -453,63 +555,3 @@ See the next slides for templates.
 Exec into the pod:
 
   kubectl exec -ti busybox /bin/sh
-
-* rktnetes - Dashboard
-
-Deploy the Kubernetes Dashboard
-
-*Workshop*time*
-
-  kubectl create -f https://rawgit.com/kubernetes/dashboard/master/src/deploy/kubernetes-dashboard.yaml
-  ip address show dev eth1
-  kubectl get svc --namespace=kube-system kubernetes-dashboard -o yaml
-
-1. Get the assigned NodePort
-2. Open http://<vm-ip>:NodePort on the host
-
-* rktnetes - Ingress
-
-Deploy an Ingress Controller based on traefik
-
-*Workshop*time*
-
-  kubectl create -f /vagrant/traefik.yaml
-
-Add the following entry to `/etc/hosts`, replace `vm-ip` with the VM IP
-
-  <vm-ip>	traefik.rktnetes
-
-.link http://traefik.rktnetes http://traefik.rktnetes
-
-* rktnetes - Ingress
-
-.image traefik-ingress.png _ 1000
-
-* rktnetes - Expose Dashboard via Ingress
-
-*Workshop*time*
-
-  apiVersion: extensions/v1beta1
-  kind: Ingress
-  metadata:
-   name: kubernetes-dashboard-ingress
-   namespace: kube-system
-  spec:
-   rules:
-     - host: dashboard.rktnetes
-       http:
-         paths:
-           - path: /
-             backend:
-               serviceName: kubernetes-dashboard
-               servicePort: 80
-
-Add the following entry to `/etc/hosts`, replace `vm-ip` with the VM IP
-
-  <vm-ip>	dashboard.rktnetes
-
-.link http://dashboard.rktnetes http://dashboard.rktnetes
-
-* rktnetes - Expose Dashboard via Ingress
-
-.image dashboard-ingress.png _ 1000

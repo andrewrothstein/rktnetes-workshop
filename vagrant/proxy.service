@@ -5,12 +5,18 @@ After=wait-for@apiserver.service
 Requires=wait-for@apiserver.service
 
 [Service]
-ExecStart=/usr/bin/hyperkube \
-	proxy \
-	--v=3 \
-	--hostname-override=127.0.0.1 \
-	--master=http://0.0.0.0:8080
+ExecStart=/usr/bin/rkt run \
+        --trust-keys-from-https \
+        --stage1-from-dir=stage1-fly.aci \
+        --volume var-run-dbus,kind=host,source=/var/run/dbus \
+        --mount volume=var-run-dbus,target=/var/run/dbus \
+        quay.io/coreos/hyperkube:v1.4.3_coreos.0 \
+        --exec=/hyperkube \
+        -- \
+        proxy \
+        --v=3 \
+        --hostname-override=127.0.0.1 \
+        --master=http://0.0.0.0:8080
 
 [Install]
 WantedBy=multi-user.target
-
